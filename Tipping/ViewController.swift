@@ -10,6 +10,7 @@ import UIKit
 
 class ViewController: UIViewController {
     
+    @IBOutlet weak var borderView: UIView!
     @IBOutlet weak var tipControl: UISegmentedControl!
     @IBOutlet weak var billField: UITextField!
     @IBOutlet weak var totalLabel: UILabel!
@@ -22,12 +23,44 @@ class ViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        let bill = defaults.double(forKey: "default_bill")
+        billField.text = String.init(format: "%.2f", bill)
         defaults.set(15, forKey:"default_tip")
         defaults.set(0, forKey:"default_currency_idx")
         defaults.set(1.0, forKey:"default_currency_ratio")
         defaults.synchronize()
         calculateTip()
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(applicationDidEnterBackground(_:)),
+            name: NSNotification.Name.UIApplicationDidEnterBackground,
+            object: nil)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(applicationDidBecomeActive(_:)),
+            name: NSNotification.Name.UIApplicationDidBecomeActive,
+            object: nil)
         // Do any additional setup after loading the view, typically from a nib.
+    }
+    
+    func applicationDidEnterBackground(_ notification: NSNotification) {
+        let curDate = Date()
+        defaults.set(curDate, forKey:"last_date")
+        defaults.synchronize()
+    }
+    
+    func applicationDidBecomeActive(_ notification: NSNotification) {
+        // do something
+        let storedDate = defaults.object(forKey: "last_date") as! Date
+        let curDate = Date()
+        let timeDiff = curDate.timeIntervalSince(storedDate) / 60
+        
+        if (timeDiff >= 1){
+            billField.text = String.init(format: "%.2f", 0.0)
+            calculateTip()
+        }
+        
     }
     
     override func didReceiveMemoryWarning() {
@@ -38,8 +71,7 @@ class ViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         let defaultCurrentExchange = defaults.double(forKey: "default_currency_ratio")
-        
-        let bill = Double(billField.text!) ?? 0
+        let bill = defaults.double(forKey: "default_bill")
         
         if (currentCurrencyExchange != defaultCurrentExchange && bill != 0) {
             let newBill = bill * defaultCurrentExchange
@@ -47,13 +79,31 @@ class ViewController: UIViewController {
         }
         calculateTip()
     }
-    
+    override func viewWillDisappear(_ animated: Bool) {
+        NotificationCenter.default.removeObserver(self)
+    }
     @IBAction func onTap(_ sender: Any) {
         view.endEditing(true)
+        randomizeBorderViewColor()
     }
     
     @IBAction func recalculateTip(_ sender: Any) {
         calculateTip()
+        randomizeBorderViewColor()
+        let newBill = Double(billField.text!) ?? 0
+        defaults.set(newBill, forKey:"default_bill")
+        defaults.synchronize()
+        
+    }
+    func randomizeBorderViewColor() {
+        let red:CGFloat = CGFloat(drand48())
+        let green:CGFloat = CGFloat(drand48())
+        let blue:CGFloat = CGFloat(drand48())
+        
+        UIView.animate(withDuration: 0.4, animations: {
+            self.borderView.backgroundColor = UIColor(red:red, green: green, blue: blue, alpha: 1.0)
+        }, completion:nil)
+        
     }
     
     func calculateTip() {
